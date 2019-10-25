@@ -483,11 +483,15 @@ int main(int argc, char *argv[])
     fd_set readfds;
     struct timeval tv;
     int result;
-    char * port = "5685";
+    char * port  = "5685";
+    char * eport = "5400";
     internal_data_t data;
     char * filename = "bootstrap_server.ini";
     int opt;
     FILE * fd;
+    int esock;
+
+
     command_desc_t commands[] =
     {
         {"boot", "Bootstrap a client (Server Initiated).", " boot URI [NAME]\r\n"
@@ -543,8 +547,17 @@ int main(int argc, char *argv[])
         opt += 1;
     }
 
+
     data.sock = create_socket(port, data.addressFamily);
     if (data.sock < 0)
+    {
+        fprintf(stderr, "Error opening socket: %d\r\n", errno);
+        return -1;
+    }
+
+    printf("creating e socket...\n");
+    esock = create_socket(eport, AF_INET6);
+    if (esock < 0)
     {
         fprintf(stderr, "Error opening socket: %d\r\n", errno);
         return -1;
@@ -584,8 +597,9 @@ int main(int argc, char *argv[])
         endpoint_t * endP;
 
         FD_ZERO(&readfds);
-        FD_SET(data.sock, &readfds);
+        FD_SET(esock, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
+        FD_SET(data.sock, &readfds);
 
         tv.tv_sec = 60;
         tv.tv_usec = 0;
@@ -663,6 +677,18 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+            else if (FD_ISSET(esock, &readfds))
+            {
+                printf("\nxr:\n");
+                numBytes = recv(esock, buffer, MAX_PACKET_SIZE, 0);
+
+                if (numBytes == -1)
+                {
+                    fprintf(stderr, "Error in recvfrom(): %d\r\n", errno);
+                }
+
+                printf("\nrecibo:\n");
+            }
             // command line input
             else if (FD_ISSET(STDIN_FILENO, &readfds))
             {
@@ -683,6 +709,10 @@ int main(int argc, char *argv[])
                     fprintf(stdout, "\r\n");
                 }
             }
+
+
+
+
             // Do operations on endpoints
             prv_endpoint_clean(&data);
 
