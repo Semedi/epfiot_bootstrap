@@ -681,36 +681,41 @@ int main(int argc, char *argv[])
             {
                 struct sockaddr_storage addr;
                 socklen_t addrLen;
+                char *hello = "Hello from server"; 
 
-                printf("\nxr:\n");
+                printf("petition from epfiot:\n");
                 numBytes = recvfrom(esock, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&addr, &addrLen);
 
                 if (numBytes == -1)
                 {
                     fprintf(stderr, "Error in recvfrom(): %d\r\n", errno);
                 }
-
-                char s[INET6_ADDRSTRLEN];
-                in_port_t port;
-					      s[0] = 0;
-                if (AF_INET == addr.ss_family)
+                else
                 {
-                    struct sockaddr_in *saddr = (struct sockaddr_in *)&addr;
-                    inet_ntop(saddr->sin_family, &saddr->sin_addr, s, INET6_ADDRSTRLEN);
-                    port = saddr->sin_port;
-                }
-                else if (AF_INET6 == addr.ss_family)
-                {
-                    struct sockaddr_in6 *saddr = (struct sockaddr_in6 *)&addr;
-                    inet_ntop(saddr->sin6_family, &saddr->sin6_addr, s, INET6_ADDRSTRLEN);
-                    port = saddr->sin6_port;
+                  char s[INET6_ADDRSTRLEN];
+                  in_port_t port;
+                  s[0] = 0;
+                  if (AF_INET == addr.ss_family)
+                  {
+                      struct sockaddr_in *saddr = (struct sockaddr_in *)&addr;
+                      inet_ntop(saddr->sin_family, &saddr->sin_addr, s, INET6_ADDRSTRLEN);
+                      port = saddr->sin_port;
+                  }
+                  else if (AF_INET6 == addr.ss_family)
+                  {
+                      struct sockaddr_in6 *saddr = (struct sockaddr_in6 *)&addr;
+                      inet_ntop(saddr->sin6_family, &saddr->sin6_addr, s, INET6_ADDRSTRLEN);
+                      port = saddr->sin6_port;
+                  }
+
+                  fprintf(stderr, "%d bytes received from [%s]:%hu\r\n", numBytes, s, ntohs(port));
+                  output_buffer(stderr, buffer, numBytes, 0);
+                  fwrite(buffer, numBytes, 1, stdout);
+
+
+                  sendto(esock, (const char *)hello, strlen(hello),  MSG_CONFIRM, (const struct sockaddr *) &addr, addrLen); 
                 }
 
-                fprintf(stderr, "%d bytes received from [%s]:%hu\r\n", numBytes, s, ntohs(port));
-                output_buffer(stderr, buffer, numBytes, 0);
-                fwrite(buffer, numBytes, 1, stdout);
-
-                printf("\nrecibo:\n");
             }
             // command line input
             else if (FD_ISSET(STDIN_FILENO, &readfds))
@@ -733,6 +738,7 @@ int main(int argc, char *argv[])
                 }
             }
 
+            printf("proccesed\n");
 
 
 
