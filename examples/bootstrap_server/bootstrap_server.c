@@ -314,31 +314,39 @@ static int prv_bootstrap_callback(void * sessionH,
     {
     case COAP_NO_ERROR:
     {
-        bs_endpoint_info_t * endInfoP;
+        bs_endpoint_info_t * endInfoP = NULL;
 
         // Display
         fprintf(stdout, "\r\nBootstrap request from \"%s\"\r\n", name);
 
-        // find Bootstrap Info for this endpoint
-        endInfoP = dataP->bsInfo->endpointList;
-        while (endInfoP != NULL
-            && endInfoP->name != NULL
-            && strcmp(name, endInfoP->name) != 0)
+        
+        if (dataP->bsInfo != NULL)
         {
-            endInfoP = endInfoP->next;
-        }
-        if (endInfoP == NULL)
-        {
-            // find default Bootstrap Info
-            endInfoP = dataP->bsInfo->endpointList;
-            while (endInfoP != NULL
-                && endInfoP->name != NULL)
-            {
-                endInfoP = endInfoP->next;
-            }
+          // find Bootstrap Info for this endpoint
+          endInfoP = dataP->bsInfo->endpointList;
+          while (endInfoP != NULL
+              && endInfoP->name != NULL
+              && strcmp(name, endInfoP->name) != 0)
+          {
+              endInfoP = endInfoP->next;
+          }
+          if (endInfoP == NULL)
+          {
+              // find default Bootstrap Info
+              endInfoP = dataP->bsInfo->endpointList;
+              while (endInfoP != NULL
+                  && endInfoP->name != NULL)
+              {
+                  endInfoP = endInfoP->next;
+              }
+          }
         }
         // Nothing found, discard the request
-        if (endInfoP == NULL)return COAP_IGNORE;
+        if (endInfoP == NULL)
+        {
+          printf("not suitable servers found for %s\n", name);
+          return COAP_IGNORE;
+        }
 
         endP = prv_endpoint_new(dataP, sessionH);
         if (endP == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
@@ -580,13 +588,13 @@ int main(int argc, char *argv[])
     }
 
     // load boostrap config:
-    data.bsInfo = bs_get_info(fd);
+    //data.bsInfo = bs_get_info(fd);
     fclose(fd);
-    if (data.bsInfo == NULL)
-    {
-        fprintf(stderr, "Reading Bootstrap Info from file %s failed.\r\n", filename);
-        return -1;
-    }
+    //if (data.bsInfo == NULL)
+    //{
+    //    fprintf(stderr, "Reading Bootstrap Info from file %s failed.\r\n", filename);
+    //    return -1;
+    //}
 
     lwm2m_set_bootstrap_callback(data.lwm2mH, prv_bootstrap_callback, (void *)&data);
 
