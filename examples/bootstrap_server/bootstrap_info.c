@@ -238,6 +238,46 @@ error:
     return 0;
 }
 
+
+
+static read_server_t * fill_server()
+{
+    read_server_t * readSrvP;
+    readSrvP = (read_server_t *)lwm2m_malloc(sizeof(read_server_t));
+    if (readSrvP == NULL) return NULL;
+    memset(readSrvP, 0, sizeof(read_server_t));
+
+    // parameters
+    char * id       = "1";
+    char * uri      = "coap://localhost:5683";
+    char *lifetime  = "300";
+
+    int num = 0;
+    if (sscanf(id, "%d", &num) != 1) goto error;
+    if (num <= 0 || num > LWM2M_MAX_ID) goto error;
+    readSrvP->isBootstrap = true;
+
+    if (sscanf(lifetime, "%d", &num) != 1) goto error;
+    if (num <= 0) goto error;
+    readSrvP->lifetime = num;
+    readSrvP->securityMode = LWM2M_SECURITY_MODE_NONE;
+
+    return readSrvP;
+error:
+    if (readSrvP != NULL)
+    {
+        if (readSrvP->uri != NULL) lwm2m_free(readSrvP->uri);
+        if (readSrvP->publicKey != NULL) lwm2m_free(readSrvP->publicKey);
+        if (readSrvP->secretKey != NULL) lwm2m_free(readSrvP->secretKey);
+        if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
+        lwm2m_free(readSrvP);
+    }
+    //if (key != NULL) lwm2m_free(key);
+    //if (value != NULL) lwm2m_free(value);
+
+    return NULL;
+}
+
 static read_server_t * prv_read_next_server(FILE * fd)
 {
     char * key;
@@ -625,6 +665,43 @@ error:
     return -1;
 }
 
+static bs_endpoint_info_t * fill_endpoint()
+{
+    bs_endpoint_info_t * endptP;
+    bs_command_t * cmdP;
+    endptP = (bs_endpoint_info_t *)lwm2m_malloc(sizeof(bs_endpoint_info_t));
+    if (endptP == NULL) return NULL;
+    memset(endptP, 0, sizeof(bs_endpoint_info_t));
+    cmdP = NULL;
+
+
+    char * name    = "test";
+    char * uri_str = "uri";
+
+    endptP->name = name;
+
+    //delete
+    lwm2m_uri_t uri;
+
+    if (lwm2m_stringToUri(uri_str, strlen(uri_str), &uri) == 0) goto error;
+
+    cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+    if (cmdP == NULL) goto error;
+    memset(cmdP, 0, sizeof(bs_command_t));
+
+    cmdP->operation = BS_DELETE;
+    if (LWM2M_URI_IS_SET_OBJECT(&uri))
+    {
+        cmdP->uri = (lwm2m_uri_t *)lwm2m_malloc(sizeof(lwm2m_uri_t));
+        if (cmdP->uri == NULL) goto error;
+        memcpy(cmdP->uri, &uri, sizeof(lwm2m_uri_t));
+    }
+
+    lwm2m_free(uri_str);
+error:
+    printf("error");
+}
+
 static bs_endpoint_info_t * prv_read_next_endpoint(FILE * fd)
 {
     char * key;
@@ -775,6 +852,7 @@ bs_info_t *  bs_get_info(FILE * fd)
     if (infoP == NULL) return NULL;
     memset(infoP, 0, sizeof(bs_info_t));
 
+    //READ ALL_SERVERS, ADD TO LINKED LIST
     do
     {
         readSrvP = prv_read_next_server(fd);

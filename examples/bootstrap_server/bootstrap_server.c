@@ -579,6 +579,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    // load boostrap config:
     data.bsInfo = bs_get_info(fd);
     fclose(fd);
     if (data.bsInfo == NULL)
@@ -737,9 +738,6 @@ int main(int argc, char *argv[])
                     fprintf(stdout, "\r\n");
                 }
             }
-
-            printf("proccesed\n");
-
 
 
             // Do operations on endpoints
