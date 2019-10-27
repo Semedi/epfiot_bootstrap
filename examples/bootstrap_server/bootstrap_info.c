@@ -256,7 +256,7 @@ read_server_t * fill_server()
     int num = 0;
     if (sscanf(id, "%d", &num) != 1) goto error;
     if (num <= 0 || num > LWM2M_MAX_ID) goto error;
-    readSrvP->isBootstrap = true;
+    readSrvP->isBootstrap = false;
 
     if (sscanf(lifetime, "%d", &num) != 1) goto error;
     if (num <= 0) goto error;
@@ -273,8 +273,6 @@ error:
         if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
         lwm2m_free(readSrvP);
     }
-    //if (key != NULL) lwm2m_free(key);
-    //if (value != NULL) lwm2m_free(value);
 
     return NULL;
 }
@@ -666,26 +664,22 @@ error:
     return -1;
 }
 
-static bs_endpoint_info_t * fill_endpoint()
+bs_endpoint_info_t * fill_endpoint()
 {
     bs_endpoint_info_t * endptP;
-    bs_command_t * cmdP;
+    bs_command_t * cmdP = NULL;
+    char * zero  = "/0";
+
+    // bs_endpoint_info initialization:
     endptP = (bs_endpoint_info_t *)lwm2m_malloc(sizeof(bs_endpoint_info_t));
     if (endptP == NULL) return NULL;
     memset(endptP, 0, sizeof(bs_endpoint_info_t));
-    cmdP = NULL;
 
-
-    char * name    = "test";
-    char * uri_str = "uri";
-
-    endptP->name = name;
-
-    //delete
+    // delete
     lwm2m_uri_t uri;
+    if (lwm2m_stringToUri(zero, strlen(zero), &uri) == 0) goto error;
 
-    if (lwm2m_stringToUri(uri_str, strlen(uri_str), &uri) == 0) goto error;
-
+    // command allocation
     cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
     if (cmdP == NULL) goto error;
     memset(cmdP, 0, sizeof(bs_command_t));
@@ -698,9 +692,85 @@ static bs_endpoint_info_t * fill_endpoint()
         memcpy(cmdP->uri, &uri, sizeof(lwm2m_uri_t));
     }
 
-    lwm2m_free(uri_str);
+    // important:
+    //  we do not free cmdP memory allocation if !error
+    //  if ussed by endptP->CommandList
+
+    // ADD command
+    if (cmdP != NULL)
+    {
+        // comandlist is empty:
+        if (endptP->commandList == NULL)
+        {
+            endptP->commandList = cmdP;
+        }
+        // commandlist is not empty:
+        else
+        {
+            bs_command_t * parentP;
+
+            // add command to the end of commandlist:
+            parentP = endptP->commandList;
+            while (parentP->next != NULL)
+            {
+                parentP = parentP->next;
+            }
+            parentP->next = cmdP;
+        }
+
+        // ready for reuse pointer:
+        cmdP = NULL;
+    }
+
+    // ADD command finish
+    if (endptP->commandList != NULL)
+    {
+        bs_command_t * parentP;
+
+        cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+        if (cmdP == NULL) goto error;
+        memset(cmdP, 0, sizeof(bs_command_t));
+
+        cmdP->operation = BS_FINISH;
+
+        // add command to the end of commandlist:
+        parentP = endptP->commandList;
+        while (parentP->next != NULL)
+        {
+            parentP = parentP->next;
+        }
+        parentP->next = cmdP;
+    }
+
+    return endptP;
+
 error:
-    printf("error");
+    printf("\nerror creating endpoint_info\n");
+
+    while (cmdP != NULL)
+    {
+        bs_command_t * tempP;
+
+        if (cmdP->uri != NULL) lwm2m_free(cmdP->uri);
+        tempP = cmdP;
+        cmdP = cmdP->next;
+        lwm2m_free(tempP);
+    }
+    if (endptP != NULL)
+    {
+        if (endptP->name != NULL) lwm2m_free(endptP->name);
+        while (endptP->commandList != NULL)
+        {
+            cmdP = endptP->commandList;
+            endptP->commandList =endptP->commandList->next;
+
+            if (cmdP->uri != NULL) lwm2m_free(cmdP->uri);
+            lwm2m_free(cmdP);
+        }
+        lwm2m_free(endptP);
+    }
+
+    return NULL;
 }
 
 static bs_endpoint_info_t * prv_read_next_endpoint(FILE * fd)
@@ -875,6 +945,17 @@ void process_epfiot(char * buff, int size, bs_info_t * infoP)
 
     printf("server added successfully\n");
   }
+
+  cltInfoP = fill_endpoint();
+
+  if (cltInfoP != NULL)
+  {
+      cltInfoP->next = infoP->endpointList;
+      infoP->endpointList = cltInfoP;
+
+      printf("endpoint added successfully\n");
+  }
+
 
   return;
 error:
