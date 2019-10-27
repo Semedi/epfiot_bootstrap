@@ -981,6 +981,151 @@ error:
     return NULL;
 }
 
+bs_endpoint_info_t * epfiot_endpoint_process(const char * pairs)
+{
+    char * key;
+    char * value;
+    bs_endpoint_info_t * endptP;
+    bs_command_t * cmdP = NULL;
+    int offset          = 0;
+
+    endptP = (bs_endpoint_info_t *)lwm2m_malloc(sizeof(bs_endpoint_info_t));
+    if (endptP == NULL) return NULL;
+    memset(endptP, 0, sizeof(bs_endpoint_info_t));
+
+    cmdP = NULL;
+
+    while (pairs[offset+1] != '\0'){
+      offset = epfiot_read_key_value(offset, pairs, &key, &value);
+      if (offset == -1)
+        goto error;
+
+      printf("\nkey=%s, value=%s\n", key, value);
+
+      if (strcasecmp(key, "Name") == 0)
+      {
+          endptP->name = value;
+      }
+      else if (strcasecmp(key, "Delete") == 0)
+      {
+          lwm2m_uri_t uri;
+
+          if (lwm2m_stringToUri(value, strlen(value), &uri) == 0) goto error;
+
+          cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+          if (cmdP == NULL) goto error;
+          memset(cmdP, 0, sizeof(bs_command_t));
+
+          cmdP->operation = BS_DELETE;
+          if (LWM2M_URI_IS_SET_OBJECT(&uri))
+          {
+              cmdP->uri = (lwm2m_uri_t *)lwm2m_malloc(sizeof(lwm2m_uri_t));
+              if (cmdP->uri == NULL) goto error;
+              memcpy(cmdP->uri, &uri, sizeof(lwm2m_uri_t));
+          }
+
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "Server") == 0)
+      {
+          int num;
+
+          if (sscanf(value, "%d", &num) != 1) goto error;
+          if (num <= 0 || num > LWM2M_MAX_ID) goto error;
+
+          cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+          if (cmdP == NULL) goto error;
+          memset(cmdP, 0, sizeof(bs_command_t));
+          cmdP->next = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+          if (cmdP->next == NULL) goto error;
+          memset(cmdP->next, 0, sizeof(bs_command_t));
+
+          cmdP->operation = BS_WRITE_SECURITY;
+          cmdP->serverId = num;
+          cmdP->next->operation = BS_WRITE_SERVER;
+          cmdP->next->serverId = num;
+
+          lwm2m_free(value);
+      }
+      else
+      {
+          // ignore key for now
+          lwm2m_free(value);
+      }
+      lwm2m_free(key);
+      if (cmdP != NULL)
+      {
+          if (endptP->commandList == NULL)
+          {
+              endptP->commandList = cmdP;
+          }
+          else
+          {
+              bs_command_t * parentP;
+
+              parentP = endptP->commandList;
+              while (parentP->next != NULL)
+              {
+                  parentP = parentP->next;
+              }
+              parentP->next = cmdP;
+          }
+          cmdP = NULL;
+      }
+
+    }
+
+    if (endptP->commandList != NULL)
+    {
+        bs_command_t * parentP;
+
+        cmdP = (bs_command_t *)lwm2m_malloc(sizeof(bs_command_t));
+        if (cmdP == NULL) goto error;
+        memset(cmdP, 0, sizeof(bs_command_t));
+
+        cmdP->operation = BS_FINISH;
+
+        parentP = endptP->commandList;
+        while (parentP->next != NULL)
+        {
+            parentP = parentP->next;
+        }
+        parentP->next = cmdP;
+    }
+
+    return endptP;
+
+error:
+    printf("\nerror creating endpoint_info\n");
+
+    if (key != NULL) lwm2m_free(key);
+    if (value != NULL) lwm2m_free(value);
+    while (cmdP != NULL)
+    {
+        bs_command_t * tempP;
+
+        if (cmdP->uri != NULL) lwm2m_free(cmdP->uri);
+        tempP = cmdP;
+        cmdP = cmdP->next;
+        lwm2m_free(tempP);
+    }
+    if (endptP != NULL)
+    {
+        if (endptP->name != NULL) lwm2m_free(endptP->name);
+        while (endptP->commandList != NULL)
+        {
+            cmdP = endptP->commandList;
+            endptP->commandList =endptP->commandList->next;
+
+            if (cmdP->uri != NULL) lwm2m_free(cmdP->uri);
+            lwm2m_free(cmdP);
+        }
+        lwm2m_free(endptP);
+    }
+
+    return NULL;
+}
+
 read_server_t * epfiot_server_process(const char * pairs)
 {
     char * key;
@@ -1092,6 +1237,8 @@ error:
         if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
         lwm2m_free(readSrvP);
     }
+    if (key != NULL) lwm2m_free(key);
+    if (value != NULL) lwm2m_free(value);
 
     return NULL;
 }
@@ -1128,13 +1275,26 @@ void epfiot_process(char * buff, int size, bs_info_t * infoP)
     {
       printf("error trying to add server\n");
     }
-
-  // EPFIOT PETITION: ADD ENDPOINT
   }
+  // EPFIOT PETITION: ADD ENDPOINT
   else if (strcasecmp(petition->key, "endpoint") == 0)
   {
-    printf("epfiot petition header: endpoint\n");
+
+    cltInfoP = epfiot_endpoint_process(petition->pairs);
+
+    if (cltInfoP != NULL)
+    {
+        cltInfoP->next = infoP->endpointList;
+        infoP->endpointList = cltInfoP;
+
+        printf("endpoint added successfully\n");
+    }
+    else
+    {
+      printf("error trying to add endpoint\n");
+    }
   }
+  // NOT IMPLEMENTED
   else
   {
     printf("epfiot petition header not recognized\n");
@@ -1143,38 +1303,8 @@ void epfiot_process(char * buff, int size, bs_info_t * infoP)
 
   free(petition);
 
-
   return;
 
-
-  //printf("\n");
-  //for (int i = 0; i < size; i++){
-  //  printf("%c",buff[i]);
-  //}
-  //printf("\n");
-
-
-  readSrvP = fill_server();
-
-  if (readSrvP != NULL)
-  {
-    if (prv_add_server(infoP, readSrvP) != 0) goto error;
-
-    printf("server added successfully\n");
-  }
-
-  cltInfoP = fill_endpoint();
-
-  if (cltInfoP != NULL)
-  {
-      cltInfoP->next = infoP->endpointList;
-      infoP->endpointList = cltInfoP;
-
-      printf("endpoint added successfully\n");
-  }
-
-
-  return;
 error:
   printf("error processing epfiot petition\n");
 
