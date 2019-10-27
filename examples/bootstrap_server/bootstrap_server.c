@@ -634,7 +634,8 @@ int main(int argc, char *argv[])
             uint8_t buffer[MAX_PACKET_SIZE];
             int numBytes;
 
-            // Packet received
+            //           LWM2M PACKET RECEIVED FROM CLIENT
+            //-----------------------------------------------------------
             if (FD_ISSET(data.sock, &readfds))
             {
                 struct sockaddr_storage addr;
@@ -653,7 +654,7 @@ int main(int argc, char *argv[])
                     in_port_t port;
                     connection_t * connP;
 
-					s[0] = 0;
+					          s[0] = 0;
                     if (AF_INET == addr.ss_family)
                     {
                         struct sockaddr_in *saddr = (struct sockaddr_in *)&addr;
@@ -686,8 +687,15 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+
+
+            //           EPFIOT BOOTSTRAP COMMUNICATION
+            //-----------------------------------------------------------
             else if (FD_ISSET(esock, &readfds))
             {
+
+                // receive and validate:
+                //
                 struct sockaddr_storage addr;
                 socklen_t addrLen;
                 char *hello = "Hello from server"; 
@@ -722,11 +730,17 @@ int main(int argc, char *argv[])
                   fwrite(buffer, numBytes, 1, stdout);
 
 
+                  // bootstrap config:
+                  //
+
+
                   sendto(esock, (const char *)hello, strlen(hello),  MSG_CONFIRM, (const struct sockaddr *) &addr, addrLen); 
                 }
 
             }
-            // command line input
+
+            //           EPFIOT BOOTSTRAP COMMUNICATION
+            //-----------------------------------------------------------
             else if (FD_ISSET(STDIN_FILENO, &readfds))
             {
                 numBytes = read(STDIN_FILENO, buffer, MAX_PACKET_SIZE - 1);
@@ -748,7 +762,8 @@ int main(int argc, char *argv[])
             }
 
 
-            // Do operations on endpoints
+            //          L2MWM ENDPOINTS OPERATIONS
+            //-----------------------------------------------------------
             prv_endpoint_clean(&data);
 
             endP = data.endpointList;
