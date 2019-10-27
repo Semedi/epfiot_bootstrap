@@ -47,6 +47,17 @@ typedef struct
 #endif
 } read_server_t;
 
+
+
+
+// EPFIOT HEADER
+typedef struct
+{
+    char *  key;
+    char * pairs;    
+} epfiot_petition;
+
+
 static int prv_find_next_section(FILE * fd,
                                  char * tag)
 {
@@ -925,16 +936,62 @@ bs_info_t * init_info()
     return infoP;
 }
 
+int epfiot_header(const char *source, int size, epfiot_petition * petition)
+{
+    int i = 0; 
+    int n = size;
+
+    for (i = 0; i < n && source[i] != '|'; i++);
+    
+    if (i == n || i+1 == n) return -1;
+    
+    petition->key   = strndup(source, i++);
+    petition->pairs = strndup(source+i, n - i);
+
+    return 0;
+}
+
+
 void process_epfiot(char * buff, int size, bs_info_t * infoP)
 {
+
+  epfiot_petition * petition;
   read_server_t * readSrvP;
   bs_endpoint_info_t * cltInfoP;
 
-  printf("\n");
-  for (int i = 0; i < size; i++){
-    printf("%c",buff[i]);
+
+  petition = (epfiot_petition *)malloc(sizeof(epfiot_petition));
+
+  if (epfiot_header(buff, size, petition) == -1)
+    goto error; 
+
+  printf("\nkey:%s, pairs: %s\n", petition->key, petition->pairs);
+
+  if (strcasecmp(petition->key, "server") == 0)
+  {
+    printf("epfiot petition header: server\n");
   }
-  printf("\n");
+  else if (strcasecmp(petition->key, "endpoint") == 0)
+  {
+    printf("epfiot petition header: endpoint\n");
+  }
+  else
+  {
+    printf("epfiot petition header not recognized\n");
+    goto error;
+  }
+
+  free(petition);
+
+
+  return;
+
+
+  //printf("\n");
+  //for (int i = 0; i < size; i++){
+  //  printf("%c",buff[i]);
+  //}
+  //printf("\n");
 
 
   readSrvP = fill_server();
@@ -959,7 +1016,14 @@ void process_epfiot(char * buff, int size, bs_info_t * infoP)
 
   return;
 error:
-  printf("error epfito process\n");
+  printf("error processing epfiot petition\n");
+
+  if (petition != NULL)
+  {
+    printf("epfiot_petition chain format error\n");
+    free(petition);
+  }
+
 }
 
 bs_info_t *  bs_get_info(FILE * fd)
