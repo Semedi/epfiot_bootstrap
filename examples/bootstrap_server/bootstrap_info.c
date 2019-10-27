@@ -842,6 +842,18 @@ error:
     return NULL;
 }
 
+
+bs_info_t * init_info()
+{
+    bs_info_t * infoP;
+    infoP = (bs_info_t *)lwm2m_malloc(sizeof(bs_info_t));
+    if (infoP == NULL) return NULL;
+
+    memset(infoP, 0, sizeof(bs_info_t));
+
+    return infoP;
+}
+
 bs_info_t *  bs_get_info(FILE * fd)
 {
     bs_info_t * infoP;

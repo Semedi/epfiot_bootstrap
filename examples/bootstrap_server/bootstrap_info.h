@@ -70,4 +70,5 @@ typedef struct
 } bs_info_t;
 
 bs_info_t * bs_get_info(FILE * fd);
+bs_info_t * init_info();
 void bs_free_info(bs_info_t * infoP);

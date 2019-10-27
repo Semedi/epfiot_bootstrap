@@ -491,6 +491,7 @@ int main(int argc, char *argv[])
     fd_set readfds;
     struct timeval tv;
     int result;
+    char *hello = "Hello from server"; 
     char * port  = "5685";
     char * eport = "5400";
     internal_data_t data;
@@ -589,6 +590,7 @@ int main(int argc, char *argv[])
 
     // load boostrap config:
     //data.bsInfo = bs_get_info(fd);
+    data.bsInfo = init_info();
     fclose(fd);
     //if (data.bsInfo == NULL)
     //{
@@ -606,9 +608,9 @@ int main(int argc, char *argv[])
         endpoint_t * endP;
 
         FD_ZERO(&readfds);
+        FD_SET(data.sock, &readfds);
         FD_SET(esock, &readfds);
         FD_SET(STDIN_FILENO, &readfds);
-        FD_SET(data.sock, &readfds);
 
         tv.tv_sec = 60;
         tv.tv_usec = 0;
@@ -694,12 +696,10 @@ int main(int argc, char *argv[])
             else if (FD_ISSET(esock, &readfds))
             {
 
-                // receive and validate:
-                //
                 struct sockaddr_storage addr;
                 socklen_t addrLen;
-                char *hello = "Hello from server"; 
 
+                addrLen = sizeof(addr);
                 printf("petition from epfiot:\n");
                 numBytes = recvfrom(esock, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&addr, &addrLen);
 
@@ -727,7 +727,7 @@ int main(int argc, char *argv[])
 
                   fprintf(stderr, "%d bytes received from [%s]:%hu\r\n", numBytes, s, ntohs(port));
                   output_buffer(stderr, buffer, numBytes, 0);
-                  fwrite(buffer, numBytes, 1, stdout);
+                  //fwrite(buffer, numBytes, 1, stdout);
 
 
                   // bootstrap config:
@@ -739,7 +739,7 @@ int main(int argc, char *argv[])
 
             }
 
-            //           EPFIOT BOOTSTRAP COMMUNICATION
+            //           STDIN
             //-----------------------------------------------------------
             else if (FD_ISSET(STDIN_FILENO, &readfds))
             {
