@@ -240,11 +240,12 @@ error:
 
 
 
-static read_server_t * fill_server()
+read_server_t * fill_server()
 {
     read_server_t * readSrvP;
     readSrvP = (read_server_t *)lwm2m_malloc(sizeof(read_server_t));
     if (readSrvP == NULL) return NULL;
+
     memset(readSrvP, 0, sizeof(read_server_t));
 
     // parameters
@@ -852,6 +853,32 @@ bs_info_t * init_info()
     memset(infoP, 0, sizeof(bs_info_t));
 
     return infoP;
+}
+
+void process_epfiot(char * buff, int size, bs_info_t * infoP)
+{
+  read_server_t * readSrvP;
+  bs_endpoint_info_t * cltInfoP;
+
+  printf("\n");
+  for (int i = 0; i < size; i++){
+    printf("%c",buff[i]);
+  }
+  printf("\n");
+
+
+  readSrvP = fill_server();
+
+  if (readSrvP != NULL)
+  {
+    if (prv_add_server(infoP, readSrvP) != 0) goto error;
+
+    printf("server added successfully\n");
+  }
+
+  return;
+error:
+  printf("error epfito process\n");
 }
 
 bs_info_t *  bs_get_info(FILE * fd)
