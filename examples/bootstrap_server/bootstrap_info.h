@@ -75,4 +75,4 @@ void bs_free_info(bs_info_t * infoP);
 
 // EPFIOT
 bs_info_t * init_info();
-void process_epfiot(char * buff, int size, bs_info_t * infoP);
+void epfiot_process(char * buff, int size, bs_info_t * infoP);

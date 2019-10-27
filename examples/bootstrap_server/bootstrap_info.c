@@ -251,42 +251,6 @@ error:
 
 
 
-read_server_t * fill_server()
-{
-    read_server_t * readSrvP;
-    readSrvP = (read_server_t *)lwm2m_malloc(sizeof(read_server_t));
-    if (readSrvP == NULL) return NULL;
-
-    memset(readSrvP, 0, sizeof(read_server_t));
-
-    // parameters
-    char * id       = "1";
-    char * uri      = "coap://localhost:5683";
-    char *lifetime  = "300";
-
-    int num = 0;
-    if (sscanf(id, "%d", &num) != 1) goto error;
-    if (num <= 0 || num > LWM2M_MAX_ID) goto error;
-    readSrvP->isBootstrap = false;
-
-    if (sscanf(lifetime, "%d", &num) != 1) goto error;
-    if (num <= 0) goto error;
-    readSrvP->lifetime = num;
-    readSrvP->securityMode = LWM2M_SECURITY_MODE_NONE;
-
-    return readSrvP;
-error:
-    if (readSrvP != NULL)
-    {
-        if (readSrvP->uri != NULL) lwm2m_free(readSrvP->uri);
-        if (readSrvP->publicKey != NULL) lwm2m_free(readSrvP->publicKey);
-        if (readSrvP->secretKey != NULL) lwm2m_free(readSrvP->secretKey);
-        if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
-        lwm2m_free(readSrvP);
-    }
-
-    return NULL;
-}
 
 static read_server_t * prv_read_next_server(FILE * fd)
 {
@@ -951,8 +915,188 @@ int epfiot_header(const char *source, int size, epfiot_petition * petition)
     return 0;
 }
 
+static int epfiot_read_key_value(int off, const char * source,  char ** key, char ** value)
+{
+    int i, j = 0;
+    int n  = strlen(source);
 
-void process_epfiot(char * buff, int size, bs_info_t * infoP)
+    *key   = NULL;
+    *value = NULL;
+
+    for (i = off; i < n &&  source[i] != '='; i++);
+
+    *key = strndup(source+off, i - off);
+
+    off+=(i-off+1);
+
+    if (i == n || off == n){
+      if (key != NULL) free(*key);
+
+      return -1;
+    }
+
+    for (i=off; i < n &&  source[i] != ','; i++);
+
+    *value = strndup(source+off, i-off);
+
+    off+=(i-off+1);
+
+    return off;
+}
+
+read_server_t * fill_server()
+{
+    read_server_t * readSrvP;
+    readSrvP = (read_server_t *)lwm2m_malloc(sizeof(read_server_t));
+    if (readSrvP == NULL) return NULL;
+
+    memset(readSrvP, 0, sizeof(read_server_t));
+
+    // parameters
+    char * id       = "1";
+    char * uri      = "coap://localhost:5683";
+    char *lifetime  = "300";
+
+    int num = 0;
+    if (sscanf(id, "%d", &num) != 1) goto error;
+    if (num <= 0 || num > LWM2M_MAX_ID) goto error;
+    readSrvP->isBootstrap = false;
+
+    if (sscanf(lifetime, "%d", &num) != 1) goto error;
+    if (num <= 0) goto error;
+    readSrvP->lifetime = num;
+    readSrvP->securityMode = LWM2M_SECURITY_MODE_NONE;
+
+    return readSrvP;
+error:
+    if (readSrvP != NULL)
+    {
+        if (readSrvP->uri != NULL) lwm2m_free(readSrvP->uri);
+        if (readSrvP->publicKey != NULL) lwm2m_free(readSrvP->publicKey);
+        if (readSrvP->secretKey != NULL) lwm2m_free(readSrvP->secretKey);
+        if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
+        lwm2m_free(readSrvP);
+    }
+
+    return NULL;
+}
+
+read_server_t * epfiot_server_process(const char * pairs)
+{
+    char * key;
+    char * value;
+    int offset = 0;
+    read_server_t * readSrvP;
+
+    readSrvP = (read_server_t *)lwm2m_malloc(sizeof(read_server_t));
+    if (readSrvP == NULL) return NULL;
+    memset(readSrvP, 0, sizeof(read_server_t));
+
+    while (pairs[offset+1] != '\0'){
+      offset = epfiot_read_key_value(offset, pairs, &key, &value);
+      if (offset == -1)
+        goto error;
+
+      printf("\nkey=%s, value=%s\n", key, value);
+
+      if (strcasecmp(key, "id") == 0)
+      {
+          int num;
+
+          if (sscanf(value, "%d", &num) != 1) goto error;
+          if (num <= 0 || num > LWM2M_MAX_ID) goto error;
+          readSrvP->id = num;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "uri") == 0)
+      {
+          readSrvP->uri = value;
+      }
+      else if (strcasecmp(key, "bootstrap") == 0)
+      {
+          if (strcasecmp(value, "yes") == 0)
+          {
+              readSrvP->isBootstrap = true;
+          }
+          else if (strcasecmp(value, "no") == 0)
+          {
+              readSrvP->isBootstrap = false;
+          }
+          else goto error;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "lifetime") == 0)
+      {
+          int num;
+
+          if (sscanf(value, "%d", &num) != 1) goto error;
+          if (num <= 0) goto error;
+          readSrvP->lifetime = num;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "security") == 0)
+      {
+          if (strcasecmp(value, "nosec") == 0)
+          {
+              readSrvP->securityMode = LWM2M_SECURITY_MODE_NONE;
+          }
+          else if (strcasecmp(value, "PSK") == 0)
+          {
+              readSrvP->securityMode = LWM2M_SECURITY_MODE_PRE_SHARED_KEY;
+          }
+          else if (strcasecmp(value, "RPK") == 0)
+          {
+              readSrvP->securityMode = LWM2M_SECURITY_MODE_RAW_PUBLIC_KEY;
+          }
+          else if (strcasecmp(value, "certificate") == 0)
+          {
+              readSrvP->securityMode = LWM2M_SECURITY_MODE_CERTIFICATE;
+          }
+          else goto error;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "public") == 0)
+      {
+          readSrvP->publicKeyLen = prv_readSecurityKey(value, &(readSrvP->publicKey));
+          if (readSrvP->publicKeyLen == 0) goto error;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "server") == 0)
+      {
+          readSrvP->serverKeyLen = prv_readSecurityKey(value, &(readSrvP->serverKey));
+          if (readSrvP->serverKeyLen == 0) goto error;
+          lwm2m_free(value);
+      }
+      else if (strcasecmp(key, "secret") == 0)
+      {
+          readSrvP->secretKeyLen = prv_readSecurityKey(value, &(readSrvP->secretKey));
+          if (readSrvP->secretKeyLen == 0) goto error;
+          lwm2m_free(value);
+      }
+      else
+      {
+          // ignore key for now
+          lwm2m_free(value);
+      }
+
+      lwm2m_free(key);
+    }
+
+    return readSrvP;
+error:
+    if (readSrvP != NULL)
+    {
+        if (readSrvP->uri != NULL) lwm2m_free(readSrvP->uri);
+        if (readSrvP->publicKey != NULL) lwm2m_free(readSrvP->publicKey);
+        if (readSrvP->secretKey != NULL) lwm2m_free(readSrvP->secretKey);
+        if (readSrvP->serverKey != NULL) lwm2m_free(readSrvP->serverKey);
+        lwm2m_free(readSrvP);
+    }
+
+    return NULL;
+}
+
+void epfiot_process(char * buff, int size, bs_info_t * infoP)
 {
 
   epfiot_petition * petition;
@@ -967,9 +1111,25 @@ void process_epfiot(char * buff, int size, bs_info_t * infoP)
 
   printf("\nkey:%s, pairs: %s\n", petition->key, petition->pairs);
 
+  // EPFIOT PETITION: ADD SERVER
   if (strcasecmp(petition->key, "server") == 0)
   {
     printf("epfiot petition header: server\n");
+
+    readSrvP = epfiot_server_process(petition->pairs);
+
+    if (readSrvP != NULL)
+    {
+      if (prv_add_server(infoP, readSrvP) != 0) goto error;
+
+      printf("server added successfully\n");
+    }
+    else
+    {
+      printf("error trying to add server\n");
+    }
+
+  // EPFIOT PETITION: ADD ENDPOINT
   }
   else if (strcasecmp(petition->key, "endpoint") == 0)
   {

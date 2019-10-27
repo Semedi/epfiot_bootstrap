@@ -732,7 +732,7 @@ int main(int argc, char *argv[])
 
                   // bootstrap config:
                   //
-                  process_epfiot(buffer, numBytes, data.bsInfo);
+                  epfiot_process(buffer, numBytes, data.bsInfo);
 
 
                   sendto(esock, (const char *)hello, strlen(hello),  MSG_CONFIRM, (const struct sockaddr *) &addr, addrLen); 
