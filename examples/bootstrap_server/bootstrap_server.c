@@ -581,17 +581,18 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, handle_sigint);
 
-    fd = fopen(filename, "r");
-    if (fd == NULL)
-    {
-        fprintf(stderr, "Opening file %s failed.\r\n", filename);
-        return -1;
-    }
+    //fd = fopen(filename, "r");
+    //if (fd == NULL)
+    //{
+    //    fprintf(stderr, "Opening file %s failed.\r\n", filename);
+    //    return -1;
+    //}
 
     // load boostrap config:
     //data.bsInfo = bs_get_info(fd);
     data.bsInfo = init_info();
-    fclose(fd);
+
+    //fclose(fd);
     //if (data.bsInfo == NULL)
     //{
     //    fprintf(stderr, "Reading Bootstrap Info from file %s failed.\r\n", filename);
