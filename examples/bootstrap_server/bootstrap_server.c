@@ -352,7 +352,11 @@ static int prv_bootstrap_callback(void * sessionH,
           if(curl) {
 
             curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8080/bootstrap");
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "name=daniel");
+
+            char thing[50];
+            sprintf(thing, "name=%s", name);
+
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, thing);
 
             res = curl_easy_perform(curl);
 
